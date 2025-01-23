@@ -1,4 +1,3 @@
-
 /* matrix summation using pthreads
 
    features: uses a barrier; the Worker[0] computes
@@ -10,41 +9,41 @@
      a.out size numWorkers
 
 */
-#ifndef _REENTRANT 
-#define _REENTRANT 
-#endif 
+#ifndef _REENTRANT
+#define _REENTRANT
+#endif
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
 #include <sys/time.h>
-#define MAXSIZE 10000  /* maximum matrix size */
+#define MAXSIZE 10  /* maximum matrix size */
 #define MAXWORKERS 10   /* maximum number of workers */
+
+int globalMin;
+int globalMax;
+int posGlobalMax[2];
+int posGlobalMin[2];
+
+//one array for local maximums
+int localMax[MAXWORKERS];
+
+//one array for local minnimums
+int localMin[MAXWORKERS] ;
+
+// one array for pos of local max
+int rowPosMax[MAXWORKERS] ; //pos of i
+int colPosMax[MAXWORKERS] ; //pos of j
+
+//one array for pos of min
+int rowPosMin[MAXWORKERS]; //pos of i
+int colPosMin[MAXWORKERS] ; //pos of j
 
 pthread_mutex_t barrier;  /* mutex lock for the barrier */
 pthread_cond_t go;        /* condition variable for leaving */
-int numWorkers;           /* number of workers */ 
+int numWorkers;           /* number of workers */
 int numArrived = 0;       /* number who have arrived */
-
-
-
-//one array for local maximums
- int localMax[MAXWORKERS];
-
- //one array for local minnimums
- int localMin[MAXWORKERS] ;
-
- // one array for pos of local max
- int rowPosMax[MAXWORKERS] ;
- int colPosMax[MAXWORKERS] ;
-
- //one array for pos of min
- int rowPosMin[MAXWORKERS];
- int colPosMin[MAXWORKERS] ;
-
-
-
 
 /* a reusable counter barrier */
 void Barrier() {
@@ -77,15 +76,6 @@ int size, stripSize;  /* assume size is multiple of numWorkers */
 int sums[MAXWORKERS]; /* partial sums */
 int matrix[MAXSIZE][MAXSIZE]; /* matrix */
 
-
-// vars for min and max for each thread
-int minLoc;
-int maxLoc;
-
-
-int globalMin;
-int globalMax;
-
 void *Worker(void *);
 
 /* read command line, initialize, and create threads */
@@ -113,7 +103,7 @@ int main(int argc, char *argv[]) {
   /* initialize the matrix */
   for (i = 0; i < size; i++) {
 	  for (j = 0; j < size; j++) {
-          matrix[i][j] = rand()%99; // 1;
+          matrix[i][j] = rand()%40;
 	  }
   }
 
@@ -151,18 +141,53 @@ void *Worker(void *arg) {
 
   /* sum values in my strip */
   total = 0;
-  for (i = first; i <= last; i++)
-    for (j = 0; j < size; j++)
+
+  //filling the array with local max and min
+  localMax[myid] = 0;
+  localMin[myid] = 99;
+
+  for (i = first; i <= last; i++) {
+    for (j = 0; j < size; j++) {
       total += matrix[i][j];
+      if (matrix[i][j] > localMax[myid]) {
+        localMax[myid] = matrix[i][j];
+        rowPosMax[myid] = i;
+        colPosMax[myid] = j;
+      }
+      if (matrix[i][j] < localMin[myid]) {
+        localMin[myid] = matrix[i][j];
+        rowPosMin[myid] = i;
+        colPosMin[myid] = j;
+      }
+    }
+  }
 
 
   sums[myid] = total;
-
- 
-
-
   Barrier();
   if (myid == 0) {
+
+    //Calculating global max and min
+    globalMax = localMax[0];
+    globalMin = localMin[0];
+    posGlobalMax[0] = rowPosMax[0];
+    posGlobalMax[1] = colPosMax[0];
+    posGlobalMin[0] = rowPosMin[0];
+    posGlobalMin[1] = colPosMin[0];
+    for (i = 1; i < numWorkers; i++) {
+      if (localMax[i] > globalMax) {
+        globalMax = localMax[i];
+        posGlobalMax[0] = rowPosMax[i];
+        posGlobalMax[1] = colPosMax[i];
+      }
+      if (localMin[i] < globalMin) {
+        globalMin = localMin[i];
+        posGlobalMin[0] = rowPosMin[i];
+        posGlobalMin[1] = colPosMin[i];
+      }
+    }
+
+
     total = 0;
     for (i = 0; i < numWorkers; i++)
       total += sums[i];
@@ -171,5 +196,9 @@ void *Worker(void *arg) {
     /* print results */
     printf("The total is %d\n", total);
     printf("The execution time is %g sec\n", end_time - start_time);
+
+    printf("The global max %d is at row %d and column %d\n ", globalMax, posGlobalMax[0], posGlobalMax[1]);
+
+    printf("The global min %d is at row %d and column %d ", globalMin, posGlobalMin[0], posGlobalMin[1]);
   }
 }
