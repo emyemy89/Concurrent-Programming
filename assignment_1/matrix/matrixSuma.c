@@ -100,11 +100,12 @@ int main(int argc, char *argv[]) {
   if (numWorkers > MAXWORKERS) numWorkers = MAXWORKERS;
   stripSize = size/numWorkers;
 
+  srand(time(NULL));
   /* initialize the matrix */
   for (i = 0; i < size; i++) {
-	  for (j = 0; j < size; j++) {
-          matrix[i][j] = rand()%40;
-	  }
+    for (j = 0; j < size; j++) {
+      matrix[i][j] = rand()%99;
+    }
   }
 
   /* print the matrix */
