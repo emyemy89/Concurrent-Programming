@@ -1,14 +1,4 @@
-/* matrix summation using pthreads
 
-   features: uses a barrier; the Worker[0] computes
-             the total sum from partial sums computed by Workers
-             and prints the total sum to the standard output
-
-   usage under Linux:
-     gcc matrixSum.c -lpthread
-     a.out size numWorkers
-
-*/
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
@@ -24,52 +14,29 @@
 #define MAXWORDS 25145
 #define MAXWORDLENGTH 256
 
-
-
-#define MAXWORKERS 10   /* maximum number of workers */
+#define MAXWORKERS 10   /* maximum number of workers if W was not specified in command line */
 
 //define locks
-
 pthread_mutex_t lockPal;
 pthread_mutex_t lockSemo;
 
 
 
-//int words[MAXWORDS];
-
+//define char array pointer
 char **words = NULL;
 
+//Helper arrays and global variables
 int Palresults[MAXWORDS]; //marked with 1 if corresponding i is a palindrome
 int PalCount[MAXWORKERS] = {0}; //holds how many palindromes each thread found
-
-
 
 int Semoresults[MAXWORDS];
 int SemorCount[MAXWORKERS] = {0};
 
-
 int Paltotal = 0;
 int Semototal = 0;
+int word_count = 0; //How many words actually in file
+int numWorkers; //Actual number of workers
 
-int word_count = 0;
-
-
-pthread_mutex_t barrier;  /* mutex lock for the barrier */
-pthread_cond_t go;        /* condition variable for leaving */
-int numWorkers;           /* number of workers */
-int numArrived = 0;       /* number who have arrived */
-
-/* a reusable counter barrier */
-void Barrier() {
-  pthread_mutex_lock(&barrier);
-  numArrived++;
-  if (numArrived == numWorkers) {
-    numArrived = 0;
-    pthread_cond_broadcast(&go);
-  } else
-    pthread_cond_wait(&go, &barrier);
-  pthread_mutex_unlock(&barrier);
-}
 
 /* timer */
 double read_timer() {
@@ -87,10 +54,6 @@ double read_timer() {
 
 double start_time, end_time; /* start and end times */
 int size, stripSize;  /* assume size is multiple of numWorkers */
-
-
-
-
 
 bool isPalindrome(char *word) {
   int i;
@@ -122,20 +85,17 @@ bool isSemor(char *word) {
   return false;
 }
 
-
 void *Palindrome(void *word){
-
   int  i, j;
-
   long myid = (long)word;
+  //Define how much of the array each worker will get
   int first = myid * stripSize;
   int last = (myid == numWorkers - 1) ? (word_count - 1) : (first + stripSize - 1);
-
-
 
   for (i= first; i <= last; i++) {
     if (words[i] == NULL) {continue;}
 
+    //Check for palindroms
     if (i < MAXWORDS && isPalindrome(words[i])) {
       pthread_mutex_lock(&lockPal);
       Palresults[i] = 1;
@@ -144,6 +104,7 @@ void *Palindrome(void *word){
     }
     else {Palresults[i] = 0;}
 
+    //Check for semordnilaps
     if (i<MAXWORDS && isSemor(words[i])) {
       pthread_mutex_lock(&lockSemo);
       Semoresults[i] = 1;
@@ -157,7 +118,6 @@ void *Palindrome(void *word){
 }
 
 
-
 /* read command line, initialize, and create threads */
 int main(int argc, char *argv[]) {
   int i, j;
@@ -169,50 +129,33 @@ int main(int argc, char *argv[]) {
   pthread_attr_init(&attr);
   pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
 
-
-
-
   //FILE READING
   FILE *fp_in;
-  const char *filename = "/home/student/Desktop/HW1/Task2/wordFile";
-
-
-  char lineBuff[MAXWORDLENGTH];
-
+  const char *filename = "wordFile";
+  char lineBuff[MAXWORDLENGTH]; //Buffer
 
   fp_in = fopen(filename, "r");
   if (fp_in == NULL) {
     perror("Error opening file");
     return 1;
   }
-
   words = (char **)malloc(MAXWORDS * sizeof(char *));
-  if (words == NULL) {
-    perror("Memory allocation failed");
-    fclose(fp_in);
-    return 1;
-  }
 
   while (fgets(lineBuff, MAXWORDLENGTH, fp_in) != NULL && word_count < MAXWORDS) {
-    size_t len = strlen(lineBuff);
-    if (len > 0 && lineBuff[len - 1] == '\n') {
-      lineBuff[len - 1] = '\0';
+    size_t wordLength = strlen(lineBuff);
+    if (wordLength > 0 && lineBuff[wordLength - 1] == '\n') {
+      lineBuff[wordLength- 1] = '\0';
     }
-
+    //Allocate space for the word to be stored
     words[word_count] = (char *) malloc((strlen(lineBuff) + 1) * sizeof(char));
-
-
+    //Move the word in buffer to allocated space
     strcpy(words[word_count], lineBuff);
     word_count++;
   }
-
   fclose(fp_in);
-
   printf("There are %d words in the file.\n", word_count);
 
-
   //Initialize locks
-
   pthread_mutex_init(&lockPal, NULL);
   pthread_mutex_init(&lockSemo, NULL);
 
@@ -220,7 +163,6 @@ int main(int argc, char *argv[]) {
   numWorkers = (argc > 1) ? atoi(argv[1]) : MAXWORKERS; //Gets number of threads from command line. If not, use MAXWORKERS
   if (numWorkers > MAXWORKERS) numWorkers = MAXWORKERS;
   stripSize = (word_count + numWorkers - 1) / numWorkers;
-
 
   /* do the parallel work: create the workers */
   start_time = read_timer();
@@ -232,11 +174,13 @@ int main(int argc, char *argv[]) {
     pthread_join(workerid[l],NULL);
   }
 
-  //Write Palindromes onto output file
 
+
+
+
+  //WRITE TO OUTPUT
   FILE *fp_out;
-  const char *outfile = "/home/student/Desktop/HW1/Task2/OutputFile";
-
+  const char *outfile = "OutputFile";
   fp_out = fopen(outfile, "w");
   int PaloutCount = 0;
   int SemoutCount = 0;
@@ -263,9 +207,7 @@ int main(int argc, char *argv[]) {
       SemoutCount++;
     }
   }
-
   fclose(fp_out);
-
 
 
   for (int i = 0; i < numWorkers; i++) {
@@ -276,13 +218,10 @@ int main(int argc, char *argv[]) {
   printf("Total palindromes: %d\n", Paltotal);
   printf("Total semordnilaps words: %d\n", Semototal);
 
-
-
 //Destroy locks
 
   pthread_mutex_destroy(&lockPal);
   pthread_mutex_destroy(&lockSemo);
-
 
 
   /* get end time */
