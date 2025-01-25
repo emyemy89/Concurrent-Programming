@@ -12,7 +12,14 @@
 
 
 int threadCount = 0;  
+int numOfWorkers=0;
+int workersArrived=0;
+int numArrived=0;
+
 pthread_mutex_t mutex;
+pthread_cond_t go;
+pthread_mutex_t barrier;
+
 
 
 typedef struct {
@@ -28,6 +35,7 @@ void quicksort (int arr[], int len);
 void quicksortrec(int arr[], int min, int max);
 int split(int arr[], int min, int max);
 int swap(int *a, int *b);
+void *Worker(void *);
 
 //          7 1 8 3 6 2 |4|
 //                       |
@@ -36,11 +44,26 @@ int swap(int *a, int *b);
 //                1   3               7 8
 // 
 
+/* a reusable counter barrier */
+void Barrier() {
+  pthread_mutex_lock(&barrier);
+  numArrived++;
+  if (numArrived == numOfWorkers) {
+    numArrived = 0;
+    pthread_cond_broadcast(&go);
+  } else
+    pthread_cond_wait(&go, &barrier);
+  pthread_mutex_unlock(&barrier);
+}
+
 
 
 void quicksort (int arr[], int len){
 
-quicksortrec(arr, 0, len-1);
+    // quicksortrec(arr, 0, len-1);
+
+    Args args = {arr, 0, len - 1};
+    Worker(&args);  //start the first worker manually
 
 }
 
@@ -57,23 +80,50 @@ quicksortrec(arr, 0, len-1);
 
 void *Worker(void *arg) {
 
-Args *par = (Args *)args; //pointer to the struct
-int *arr= (*par).arr;
-int min= (*par).min;
-int max= (*par).max;
+    Args *par = (Args *)arg; //pointer to the struct {arr, min, max}
+    int *arr= (*par).arr;
+    int min= (*par).min;
+    int max= (*par).max;
 
-if(min<max){
-       int pivot= split(arr,min,max);
+    if(min<max){
+        int pivot= split(arr,min,max);
 
-       //left thread (smaller) and right (bigger)
-       pthread_t leftT, rightT;
+        //lock to modify count safely
+        pthread_mutex_lock(&mutex);
+
+        if (threadCount < MAXWORKERS) {
+
+            //left thread (smaller) and right (bigger)
+            pthread_t leftT, rightT;
 
 
-       Args leftArgs={arr,min,pivot-1};
-       Args rightArgs={arr,pivot+1,max};
+            Args leftArgs={arr,min,pivot-1};
+            Args rightArgs={arr,pivot+1,max};
 
 
+            pthread_create(&leftT, NULL, Worker, &leftArgs);
+            pthread_create(&rightT, NULL, Worker, &rightArgs);
 
+            threadCount++;
+            pthread_mutex_unlock(&mutex);
+
+            // wait for both thread to finish
+            pthread_join(leftT, NULL);
+            pthread_join(rightT, NULL);
+
+
+            //decrement count at the end
+            pthread_mutex_lock(&mutex);
+            threadCount--;
+            pthread_mutex_unlock(&mutex);
+
+
+        }else{
+            threadCount=MAXWORKERS;
+        }
+    }
+    Barrier();
+    return NULL;
 }
 
 
@@ -102,7 +152,19 @@ int swap(int *a, int *b){
 }
 
 
-
+/* timer */
+double read_timer() {
+    static bool initialized = false;
+    static struct timeval start;
+    struct timeval end;
+    if( !initialized )
+    {
+        gettimeofday( &start, NULL );
+        initialized = true;
+    }
+    gettimeofday( &end, NULL );
+    return (end.tv_sec - start.tv_sec) + 1.0e-6 * (end.tv_usec - start.tv_usec);
+}
 
 
 
@@ -110,7 +172,19 @@ int main() {
     int arr[] = {7,1,8,3,2,4};
     int length= 6;
 
+
+
+    double startTime = read_timer();
+
     quicksort(arr, length);
+
+    double endTime = read_timer();
+
+    // calculate the time elapsed
+    double elapsedTime = endTime - startTime;
+
+
+    printf("Time elapsed %.6f seconds\n", endTime - startTime);
 
 
     for (int i = 0; i < length; i++)
