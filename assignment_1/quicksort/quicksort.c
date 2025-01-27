@@ -13,7 +13,6 @@
 
 int threadCount = 0;  
 int numOfWorkers=0;
-int workersArrived=0;
 int numArrived=0;
 
 pthread_mutex_t mutex;
@@ -60,22 +59,11 @@ void Barrier() {
 
 void quicksort (int arr[], int len){
 
-    // quicksortrec(arr, 0, len-1);
-
     Args args = {arr, 0, len - 1};
     Worker(&args);  //start the first worker manually
 
 }
 
-
-// void quicksortrec(int arr[], int min, int max){
-//     if(min<max){
-//         int pivot= split(arr,min,max);
-//         quicksortrec(arr,min,pivot-1);
-//         quicksortrec(arr,pivot+1, max);
-//     }
-
-// }
 
 
 void *Worker(void *arg) {
@@ -93,7 +81,7 @@ void *Worker(void *arg) {
 
         if (threadCount < MAXWORKERS) {
 
-            //left thread (smaller) and right (bigger)
+            //left thread (smaller nb) and right (bigger nb)
             pthread_t leftT, rightT;
 
 
