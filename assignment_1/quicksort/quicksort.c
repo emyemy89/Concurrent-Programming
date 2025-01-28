@@ -8,7 +8,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define MAXWORKERS 10
+#define MAXWORKERS 6 //best perfrmace after testing
 
 
 int threadCount = 0;  
@@ -107,13 +107,18 @@ void *Worker(void *arg) {
 
 
         }else{
-            threadCount=MAXWORKERS;
+            // threadCount=MAXWORKERS;
+            pthread_mutex_unlock(&mutex);
+            // sequential fallback, use same thread:
+            Args leftArgs = {arr, min, pivot - 1};
+            Args rightArgs = {arr, pivot + 1, max};
+            Worker(&leftArgs);
+            Worker(&rightArgs);
         }
     }
     Barrier();
     return NULL;
 }
-
 
 
 
@@ -157,10 +162,43 @@ double read_timer() {
 
 
 int main() {
-    int arr[] = {7,1,8,3,2,4};
-    int length= 6;
+    // int arr[] = {7,1,8,3,2,4};
+    // int length= 6;
+
+    // double startTime = read_timer();
+    // quicksort(arr, length);
+    // double endTime = read_timer();
+
+    // // calculate the time elapsed
+    // double elapsedTime = endTime - startTime;
+    // printf("Time elapsed %.6f seconds\n", endTime - startTime);
+
+    // for (int i = 0; i < length; i++)
+    // {
+    //     printf("%d", arr[i]);
+    // }
+    
+    // return 0;
+
+    int length = 1000000; 
+    
+    int *arr = (int *)malloc(length * sizeof(int));
+    if (arr == NULL) {
+        printf("Failed!!!\n");
+        return 1;
+    }
+
+    // random integers
+    srand(time(NULL));
+    for (int i = 0; i < length; i++) {
+        arr[i] = rand() % 1000000;
+    }
 
 
+    //descending integers
+    // for (int i = 0; i < length; i++) {
+    //     arr[i] = length - 1 - i;
+    // }
 
     double startTime = read_timer();
 
@@ -168,18 +206,13 @@ int main() {
 
     double endTime = read_timer();
 
-    // calculate the time elapsed
+    //time elapsed
     double elapsedTime = endTime - startTime;
 
+    printf("Time elapsed %.6f seconds\n", elapsedTime);
 
-    printf("Time elapsed %.6f seconds\n", endTime - startTime);
-
-
-    for (int i = 0; i < length; i++)
-    {
-        printf("%d", arr[i]);
-    }
-    
+    free(arr);  //free memory
 
     return 0;
+
 }
