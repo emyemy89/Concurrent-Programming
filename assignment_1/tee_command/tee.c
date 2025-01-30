@@ -1,5 +1,5 @@
-#ifndef _REENTRANT 
-#define _REENTRANT 
+the problem seems to persisit... #ifndef REENTRANT
+#define REENTRANT
 #endif 
 #include <pthread.h>
 #include <stdlib.h>
@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define WORKERS 3 // input, output and file
+//#define WORKERS 3 // input, output and file
 #define MAX_BUFFER_SIZE 4096
 #define MAX_INPUT 100
 
@@ -23,7 +23,7 @@ pthread_cond_t space_avail;
 int buff_count;
 char input_user[MAX_INPUT];
 char buffer[MAX_BUFFER_SIZE];
-bool end_of_in=0;
+bool end_of_in=false;
 
 const char *filename;
 
@@ -76,16 +76,19 @@ void *input (){
         for (i = 0; i < strlen(input_user); i++) {
             buffer[buff_count + i] = input_user[i];
         }
-        buff_count += strlen(input_user);
+        //buff_count += strlen(input_user);
+        buff_count += (int)strlen(input_user);
+
 
 
         //data is the buffer, so signal others
         pthread_cond_signal(&data_avail);
         pthread_mutex_unlock(&lock_buff);
+
     }
     //handle end of input
     pthread_mutex_lock(&lock_buff);
-    end_of_in=1;
+    end_of_in=true;
     pthread_cond_signal(&data_avail);
     pthread_mutex_unlock(&lock_buff);
     return NULL;
@@ -135,8 +138,12 @@ void *output (){
 * */
 void *out_file (){
 
-  FILE *out_file;
-  out_file=fopen("text.txt", "w");
+  FILE *file;
+  file=fopen("text.txt", "w");
+    if (file == NULL) {
+        perror("Error opening file");
+        return NULL;
+    }
 
       while(1){
           pthread_mutex_lock(&lock_buff);
@@ -152,129 +159,15 @@ void *out_file (){
 
           int i;
           for(i=0;i<buff_count; i++){
-            fputc(buffer[i],out_file);
+            fputc(buffer[i],file);
           }
           buff_count=0;
           pthread_cond_signal(&space_avail);
           pthread_mutex_unlock(&lock_buff);
       }
 
-    fclose(out_file);
+    fclose(file);
 
-  return NULL;
+  //return NULL;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// // Shared data structure
-// typedef struct {
-//     char buffer[MAX_BUFFER_SIZE];
-//     int count;
-//     pthread_mutex_t lock;
-//     pthread_cond_t data_available;
-//     pthread_cond_t space_available;
-//     bool end_of_input;
-// } SharedBuffer;
-
-
-
-// // Input thread
-// void *input(void *arg) {
-//     while (true) {
-//         char data[MAX_LINE_LENGTH];
-//         if (fgets(data, MAX_LINE_LENGTH, stdin) == NULL) {
-//             // End of input
-//             pthread_mutex_lock(&buffer.lock);
-//             buffer.end_of_input = true;
-//             pthread_cond_broadcast(&buffer.data_available); // Signal all threads
-//             pthread_mutex_unlock(&buffer.lock);
-//             break;
-//         }
-//         pthread_mutex_lock(&buffer.lock);
-//         while (buffer.count == MAX_BUFFER_SIZE) {
-//             pthread_cond_wait(&buffer.space_available, &buffer.lock);
-//         }
-//         add_to_buffer(&buffer, data);
-//         pthread_cond_signal(&buffer.data_available); // Signal output and file threads
-//         pthread_mutex_unlock(&buffer.lock);
-//     }
-//     return NULL;
-// }
-
-// // Output thread
-// void *output(void *arg) {
-//     while (true) {
-//         pthread_mutex_lock(&buffer.lock);
-//         while (buffer.count == 0 && !buffer.end_of_input) {
-//             pthread_cond_wait(&buffer.data_available, &buffer.lock);
-//         }
-//         if (buffer.count == 0 && buffer.end_of_input) {
-//             pthread_mutex_unlock(&buffer.lock);
-//             break;
-//         }
-//         char data[MAX_LINE_LENGTH];
-//         remove_from_buffer(&buffer, data);
-//         pthread_cond_signal(&buffer.space_available); // Signal input thread
-//         pthread_mutex_unlock(&buffer.lock);
-//         printf("%s", data); // Write to stdout
-//     }
-//     return NULL;
-// }
-
-
-
-
-// // File thread
-// void *file(void *arg) {
-//     FILE *file = fopen(filename, "w");
-//     if (file == NULL) {
-//         perror("Error opening file");
-//         exit(1);
-//     }
-//     while (true) {
-//         pthread_mutex_lock(&buffer.lock);
-//         while (buffer.count == 0 && !buffer.end_of_input) {
-//             pthread_cond_wait(&buffer.data_available, &buffer.lock);
-//         }
-//         if (buffer.count == 0 && buffer.end_of_input) {
-//             pthread_mutex_unlock(&buffer.lock);
-//             break;
-//         }
-//         char data[MAX_LINE_LENGTH];
-//         remove_from_buffer(&buffer, data);
-//         pthread_cond_signal(&buffer.space_available); // Signal input thread
-//         pthread_mutex_unlock(&buffer.lock);
-//         fprintf(file, "%s", data); // Write to file
-//     }
-//     fclose(file);
-//     return NULL;
-// }
-
-
-
-
