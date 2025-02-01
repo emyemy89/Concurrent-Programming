@@ -2,6 +2,7 @@
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
+#include <ctype.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,16 +10,13 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <omp.h>
 
 
 #define MAXWORDS 25145
 #define MAXWORDLENGTH 256
 
 #define MAXWORKERS 10   /* maximum number of workers if W was not specified in command line */
-
-//define locks
-pthread_mutex_t lockPal;
-pthread_mutex_t lockSemo;
 
 
 
@@ -93,10 +91,10 @@ bool isPalindrome(char *word) {
 }
 
 bool isSemor(char *word) {
-
   //if (isPalindrome(word) == true) {
-  //return false;
+    //return false;
   //}
+
   int i;
   int wordLength = strlen(word);
   char reversed[wordLength + 1];
@@ -112,14 +110,13 @@ bool isSemor(char *word) {
   return false;
 }
 
-void *Palindrome(void *word){
-  int  i, j;
-  long myid = (long)word;
-  //Define how much of the array each worker will get
-  int first = myid * stripSize;
-  int last = (myid == numWorkers - 1) ? (word_count - 1) : (first + stripSize - 1);
+void *Palindrome(void *word) {
+  int  i,j;
 
-  for (i= first; i <= last; i++) {
+#pragma omp parallel for shared(words)
+
+  for (i= 0; i <= word_count; i++) {
+    long myid = omp_get_thread_num();
     if (words[i] == NULL) {continue;}
 
     //Check for palindroms
@@ -127,9 +124,8 @@ void *Palindrome(void *word){
 
       Palresults[i] = 1;
       PalCount[myid]++;
-      pthread_mutex_lock(&lockPal);
+#pragma omp atomic
       Paltotal++;
-      pthread_mutex_unlock(&lockPal);
     }
     else {Palresults[i] = 0;}
 
@@ -138,27 +134,18 @@ void *Palindrome(void *word){
 
       Semoresults[i] = 1;
       SemorCount[myid]++;
-      pthread_mutex_lock(&lockSemo);
+#pragma omp atomic
       Semototal++;
-      pthread_mutex_unlock(&lockSemo);
     }
     else{Semoresults[i] = 0;}
-  }
 
-  pthread_exit(NULL);
+  }
 }
 
 
 /* read command line, initialize, and create threads */
 int main(int argc, char *argv[]) {
   int i, j;
-  long l; /* use long in case of a 64-bit system */
-  pthread_attr_t attr;
-  pthread_t workerid[MAXWORKERS];
-
-  /* set global thread attributes */
-  pthread_attr_init(&attr);
-  pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
 
   //FILE READING
   FILE *fp_in;
@@ -186,35 +173,27 @@ int main(int argc, char *argv[]) {
   fclose(fp_in);
   printf("There are %d words in the file.\n", word_count);
 
-  //Initialize locks
-  pthread_mutex_init(&lockPal, NULL);
-  pthread_mutex_init(&lockSemo, NULL);
 
   /* read command line args if any */
   numWorkers = (argc > 1) ? atoi(argv[1]) : MAXWORKERS; //Gets number of threads from command line. If not, use MAXWORKERS
   if (numWorkers > MAXWORKERS) numWorkers = MAXWORKERS;
   stripSize = (word_count + numWorkers - 1) / numWorkers;
 
-  /* do the parallel work: create the workers */
-  start_time = read_timer();
-  for (l = 0; l < numWorkers; l++) {
-    pthread_create(&workerid[l], &attr, Palindrome, (void *) l);
-  }
 
-  for (l = 0; l < numWorkers; l++) {
-    pthread_join(workerid[l],NULL);
-  }
+  start_time = omp_get_wtime();
+  double start2 = read_timer();
 
+  omp_set_num_threads(numWorkers);
+  Palindrome(words);
 
-  /* get end time */
-  end_time = read_timer();
+  double end2 = read_timer();
+  end_time = omp_get_wtime();
 
 
   //WRITE TO OUTPUT
   FILE *fp_out;
   const char *outfile = "OutputFile";
   fp_out = fopen(outfile, "w");
-
 
   if (fp_out == NULL) {
     perror("Error opening output file");
@@ -240,7 +219,6 @@ int main(int argc, char *argv[]) {
   }
   fclose(fp_out);
 
-
   for (int i = 0; i < numWorkers; i++) {
     printf("Worker %d discovered %d palindromes and %d Semordnilaps\n", i, PalCount[i], SemorCount[i]);
 
@@ -248,15 +226,9 @@ int main(int argc, char *argv[]) {
   printf("Total palindromes: %d\n", Paltotal);
   printf("Total semordnilaps words: %d\n", Semototal);
 
-//Destroy locks
-
-  pthread_mutex_destroy(&lockPal);
-  pthread_mutex_destroy(&lockSemo);
-
-
-
 
 printf("total time: %f\n", end_time - start_time);
+  printf("total time 2: %f\n", end2 - start2);
 
   for (i = 0; i < word_count; i++) {
     free(words[i]);
