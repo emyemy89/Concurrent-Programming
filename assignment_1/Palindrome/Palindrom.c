@@ -55,6 +55,29 @@ double read_timer() {
 double start_time, end_time; /* start and end times */
 int size, stripSize;  /* assume size is multiple of numWorkers */
 
+bool binary_search(char* words[], char* target) {
+  int left = 0, right = word_count - 1;
+  int mid;
+
+  while(left <= right) {
+    mid = left + (right-left)/ 2;
+
+    int cmp = strcmp(words[mid], target);
+    if (cmp == 0) {
+      return true;
+    }
+
+    if (cmp > 0) {
+      right = mid - 1;
+    }
+    else {
+      left = mid + 1;
+    }
+
+  }
+  return false;
+}
+
 bool isPalindrome(char *word) {
   int i;
   int wordLength = strlen(word);
@@ -77,10 +100,10 @@ bool isSemor(char *word) {
     reversed[i] = word[wordLength - i - 1];
   }
   reversed[wordLength] = '\0';
-  for (i = 0; i < word_count; i++) {
-    if (strcmp(reversed, words[i]) == 0) {
+
+  if (binary_search(words, reversed) == true) {
       return true;
-    }
+
   }
   return false;
 }
