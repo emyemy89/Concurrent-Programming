@@ -8,11 +8,9 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define MAXWORKERS 6 //best perfrmace after testing
+#define MAXWORKERS 10 
 
-
-int threadCount = 0;  
-int numOfWorkers=0;
+int threadCount=0;  
 int numArrived=0;
 
 pthread_mutex_t mutex;
@@ -31,7 +29,7 @@ typedef struct {
 
 
 void quicksort (int arr[], int len);
-void quicksortrec(int arr[], int min, int max);
+//void quicksortrec(int arr[], int min, int max);
 int split(int arr[], int min, int max);
 int swap(int *a, int *b);
 void *Worker(void *);
@@ -47,7 +45,7 @@ void *Worker(void *);
 void Barrier() {
   pthread_mutex_lock(&barrier);
   numArrived++;
-  if (numArrived == numOfWorkers) {
+  if (numArrived == threadCount) {
     numArrived = 0;
     pthread_cond_broadcast(&go);
   } else
@@ -58,10 +56,8 @@ void Barrier() {
 
 
 void quicksort (int arr[], int len){
-
     Args args = {arr, 0, len - 1};
-    Worker(&args);  //start the first worker manually
-
+    Worker(&args);
 }
 
 
@@ -76,7 +72,7 @@ void *Worker(void *arg) {
     if(min<max){
         int pivot= split(arr,min,max);
 
-        //lock to modify count safely
+        //lock to modify count
         pthread_mutex_lock(&mutex);
 
         if (threadCount < MAXWORKERS) {
@@ -85,14 +81,25 @@ void *Worker(void *arg) {
             pthread_t leftT, rightT;
 
 
-            Args leftArgs={arr,min,pivot-1};
-            Args rightArgs={arr,pivot+1,max};
+            // Args leftArgs={arr,min,pivot-1};
+            // Args rightArgs={arr,pivot+1,max};
+
+            Args *leftArgs = (Args *)malloc(sizeof(Args));
+            Args *rightArgs = (Args *)malloc(sizeof(Args));
+            if (!leftArgs || !rightArgs) {
+                perror("Can't allocate");
+                pthread_mutex_unlock(&mutex);
+                return NULL;
+            }
+
+            *leftArgs = (Args){arr, min, pivot - 1};
+            *rightArgs = (Args){arr, pivot + 1, max};
 
 
             pthread_create(&leftT, NULL, Worker, &leftArgs);
             pthread_create(&rightT, NULL, Worker, &rightArgs);
 
-            threadCount++;
+            threadCount+=2;
             pthread_mutex_unlock(&mutex);
 
             // wait for both thread to finish
@@ -102,21 +109,22 @@ void *Worker(void *arg) {
 
             //decrement count at the end
             pthread_mutex_lock(&mutex);
-            threadCount--;
+            threadCount-=2;
             pthread_mutex_unlock(&mutex);
 
-
+            free(leftArgs);
+            free(rightArgs);
         }else{
             // threadCount=MAXWORKERS;
             pthread_mutex_unlock(&mutex);
-            // sequential fallback, use same thread:
+            //fallback, use same thread:
             Args leftArgs = {arr, min, pivot - 1};
             Args rightArgs = {arr, pivot + 1, max};
             Worker(&leftArgs);
             Worker(&rightArgs);
         }
     }
-    Barrier();
+    //Barrier();
     return NULL;
 }
 
@@ -128,14 +136,15 @@ void *Worker(void *arg) {
 int split(int arr[], int min, int max){
     int pivot= arr[max];
     int i=min;
-    for(int j=min;j<max; j++){
+    int j;
+    for(j=min;j<max; j++){
         if(arr[j]<=pivot){
             swap(&arr[i], &arr[j]);
             i++;
         }
     }
     swap(&arr[i], &arr[max]); // bring pivot in the middle
-    return i; // this is where the pivot is
+    return i; // pos of pivot 
 }
 
 int swap(int *a, int *b){
@@ -161,26 +170,10 @@ double read_timer() {
 
 
 
-int main() {
-    // int arr[] = {7,1,8,3,2,4};
-    // int length= 6;
+int main(int argc, char *argv[]) {
 
-    // double startTime = read_timer();
-    // quicksort(arr, length);
-    // double endTime = read_timer();
-
-    // // calculate the time elapsed
-    // double elapsedTime = endTime - startTime;
-    // printf("Time elapsed %.6f seconds\n", endTime - startTime);
-
-    // for (int i = 0; i < length; i++)
-    // {
-    //     printf("%d", arr[i]);
-    // }
-    
-    // return 0;
-
-    int length = 1000000; 
+    int length = 10000; 
+    threadCount = (argc > 2)? atoi(argv[2]) : MAXWORKERS;
     
     int *arr = (int *)malloc(length * sizeof(int));
     if (arr == NULL) {
@@ -190,28 +183,25 @@ int main() {
 
     // random integers
     srand(time(NULL));
-    for (int i = 0; i < length; i++) {
-        arr[i] = rand() % 1000000;
+    int i;
+    for (i = 0; i < length; i++) {
+        arr[i] = rand() % 10000;
     }
 
-
-    //descending integers
-    // for (int i = 0; i < length; i++) {
-    //     arr[i] = length - 1 - i;
-    // }
-
     double startTime = read_timer();
-
     quicksort(arr, length);
-
     double endTime = read_timer();
 
-    //time elapsed
     double elapsedTime = endTime - startTime;
+
+    //debug
+//     for (int i = 0; i < 10; i++) {
+//         printf("%d%s", arr[i], (i < length - 1) ? " " : "");
+//     }
 
     printf("Time elapsed %.6f seconds\n", elapsedTime);
 
-    free(arr);  //free memory
+    free(arr); 
 
     return 0;
 
