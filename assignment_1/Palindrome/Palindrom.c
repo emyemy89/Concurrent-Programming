@@ -120,18 +120,22 @@ void *Palindrome(void *word){
 
     //Check for palindroms
     if (i < MAXWORDS && isPalindrome(words[i])) {
-      pthread_mutex_lock(&lockPal);
+
       Palresults[i] = 1;
       PalCount[myid]++;
+      pthread_mutex_lock(&lockPal);
+      Paltotal++;
       pthread_mutex_unlock(&lockPal);
     }
     else {Palresults[i] = 0;}
 
     //Check for semordnilaps
     if (i<MAXWORDS && isSemor(words[i])) {
-      pthread_mutex_lock(&lockSemo);
+
       Semoresults[i] = 1;
       SemorCount[myid]++;
+      pthread_mutex_lock(&lockSemo);
+      Semototal++;
       pthread_mutex_unlock(&lockSemo);
     }
     else{Semoresults[i] = 0;}
@@ -205,8 +209,7 @@ int main(int argc, char *argv[]) {
   FILE *fp_out;
   const char *outfile = "OutputFile";
   fp_out = fopen(outfile, "w");
-  int PaloutCount = 0;
-  int SemoutCount = 0;
+
 
   if (fp_out == NULL) {
     perror("Error opening output file");
@@ -219,7 +222,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < word_count; i++) {
     if (Palresults[i] == 1) {
       fprintf(fp_out, "%s\n", words[i]);
-      PaloutCount++;
+
     }
   }
   fprintf(fp_out, "----------------------------------------------------\nSemordnilaps:\n");
@@ -227,7 +230,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < word_count; i++) {
     if (Semoresults[i] == 1) {
       fprintf(fp_out, "%s\n", words[i]);
-      SemoutCount++;
+
     }
   }
   fclose(fp_out);
@@ -235,8 +238,7 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < numWorkers; i++) {
     printf("Worker %d discovered %d palindromes and %d Semordnilaps\n", i, PalCount[i], SemorCount[i]);
-    Paltotal += PalCount[i];
-    Semototal += SemorCount[i];
+
   }
   printf("Total palindromes: %d\n", Paltotal);
   printf("Total semordnilaps words: %d\n", Semototal);
