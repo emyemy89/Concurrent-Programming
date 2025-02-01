@@ -12,16 +12,15 @@
 #define MAX_INPUT 100
 
 pthread_mutex_t lock_buff;
-pthread_cond_t data_avail; //data is available in the buffer
-pthread_cond_t space_avail; //space is available in the buffer
-pthread_cond_t buff_done; //buffer has been processed
+pthread_cond_t data_avail;
+
 
 int buff_count;
 char input_user[MAX_INPUT];
 char buffer[MAX_BUFFER_SIZE];
-bool end_of_in = false;
-bool ready_for_out = false;  // buffer is ready for output
-bool processed_by_out = false; //buffer has been processed by output thread
+bool end_of_in = 0;
+bool ready_for_out = 0;  //buffer is ready for output thread
+bool processed_by_out = 0; //buffer has been processed by output thread
 
 FILE *file;
 
@@ -30,12 +29,7 @@ void *output();
 void *out_file();
 
 int main(int argc, char *argv[]) {
-
-    pthread_mutex_init(&lock_buff, NULL);
-    pthread_cond_init(&data_avail, NULL);
-    pthread_cond_init(&space_avail, NULL);
-    pthread_cond_init(&buff_done, NULL);
-
+    
     file = fopen(argv[1], "w");
 
 
@@ -67,59 +61,47 @@ int main(int argc, char *argv[]) {
 void *input() {
     while (fgets(input_user, MAX_INPUT, stdin) != NULL) {
         pthread_mutex_lock(&lock_buff);
-
-
-        //copy input to buffer//
+        //copy input to buffer
         strncpy(buffer + buff_count, input_user, strlen(input_user));
         buff_count += strlen(input_user);
-
-        //signal when data is available//
+        //signal when data is available
         pthread_cond_signal(&data_avail);
         pthread_mutex_unlock(&lock_buff);
     }
-
-    //end of input//
-    end_of_in = true;
-
+    //end of input
+    end_of_in = 1;
     return NULL;
 }
 
 
 /*The output thread reads data from the buffer and writes it to stdout:
  * - the process terminates if buffer is empty and there is no more input;
- * - thread waits until out_file has processed buffer;
+ * - thread waits until out_file has processed what is in the buffer;
  * - it writes data from the buffer to stdout using putchar and then resets the buffer to signal termination;
  * - in the end, it unlocks the buffer.
  */
 void *output() {
-    while (true) {
+    while (1) {
         pthread_mutex_lock(&lock_buff);
-
-        //check if we should exit//
+        //termination condition
         if (buff_count == 0 && end_of_in) {
             pthread_mutex_unlock(&lock_buff);
             break;
         }
-
-        // Wait until the buffer has been processed by the out_file thread//
+        //let out_file thread process the buffer
         while (!ready_for_out) {
-            pthread_cond_wait(&buff_done, &lock_buff);
+            pthread_cond_wait(&data_avail, &lock_buff);
         }
-
-        // Write data to std output//
+        //write data to std output
         for (int i = 0; i < buff_count; i++) {
             putchar(buffer[i]);
         }
-
         buff_count = 0;
-
-        // Signal that output thread has processed the buffer
-        processed_by_out = true;
-        pthread_cond_signal(&space_avail);
-
+        // let other threads use the buffer when done
+        processed_by_out = 1;
+        pthread_cond_signal(&data_avail);
         pthread_mutex_unlock(&lock_buff);
     }
-
     return NULL;
 }
 
@@ -131,37 +113,29 @@ void *output() {
      * - after that it signals the output thread to start handling data;
      */
 void *out_file() {
-    while (true) {
+    while (1) {
         pthread_mutex_lock(&lock_buff);
-
         // Wait for data to be available
         while (buff_count == 0 && !end_of_in) {
             pthread_cond_wait(&data_avail, &lock_buff);
         }
-
-        // Check if we should exit
+        // termination condition
         if (buff_count == 0 && end_of_in) {
             pthread_mutex_unlock(&lock_buff);
             break;
         }
-
         // write to file
         for (int i = 0; i < buff_count; i++) {
             fputc(buffer[i], file);
         }
         fflush(file);
-
-        ready_for_out = true;
-        pthread_cond_signal(&buff_done);
-
+        ready_for_out = 1;
+        pthread_cond_signal(&data_avail);
         // let the output thread process the buffer
         while (processed_by_out==0) {
-            pthread_cond_wait(&space_avail, &lock_buff);
+            pthread_cond_wait(&data_avail, &lock_buff);
         }
-
         pthread_mutex_unlock(&lock_buff);
     }
-
     return NULL;
 }
-
