@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <ctype.h>
 
 
 #define MAXWORDS 25145
@@ -38,6 +39,7 @@ int word_count = 0; //How many words actually in file
 int numWorkers; //Actual number of workers
 
 
+
 /* timer */
 double read_timer() {
     static bool initialized = false;
@@ -60,7 +62,7 @@ bool binary_search(char* words[], char* target) {
   int mid;
 
   while(left <= right) {
-    mid = left + (right-left)/ 2;
+    mid = (left+right)/ 2;
 
     int cmp = strcmp(words[mid], target);
     if (cmp == 0) {
@@ -77,7 +79,6 @@ bool binary_search(char* words[], char* target) {
   }
   return false;
 }
-
 bool isPalindrome(char *word) {
   int i;
   int wordLength = strlen(word);
@@ -94,9 +95,7 @@ bool isPalindrome(char *word) {
 
 bool isSemor(char *word) {
 
-  //if (isPalindrome(word) == true) {
-  //return false;
-  //}
+
   int i;
   int wordLength = strlen(word);
   char reversed[wordLength + 1];
@@ -123,18 +122,19 @@ void *Palindrome(void *word){
     if (words[i] == NULL) {continue;}
 
     //Check for palindroms
-    if (i < MAXWORDS && isPalindrome(words[i])) {
+    if (i < word_count && isPalindrome(words[i])) {
 
       Palresults[i] = 1;
       PalCount[myid]++;
       pthread_mutex_lock(&lockPal);
       Paltotal++;
       pthread_mutex_unlock(&lockPal);
+      continue; //if palindrome then it is not a semor
     }
     else {Palresults[i] = 0;}
 
     //Check for semordnilaps
-    if (i<MAXWORDS && isSemor(words[i])) {
+    if (i<word_count && isSemor(words[i])) {
 
       Semoresults[i] = 1;
       SemorCount[myid]++;
@@ -177,14 +177,20 @@ int main(int argc, char *argv[]) {
     if (wordLength > 0 && lineBuff[wordLength - 1] == '\n') {
       lineBuff[wordLength- 1] = '\0';
     }
+    for (j = 0; j < wordLength; j++) {
+      lineBuff[j] = tolower(lineBuff[j]);
+    }
     //Allocate space for the word to be stored
     words[word_count] = (char *) malloc((strlen(lineBuff) + 1) * sizeof(char));
     //Move the word in buffer to allocated space
     strcpy(words[word_count], lineBuff);
     word_count++;
+
+
   }
   fclose(fp_in);
   printf("There are %d words in the file.\n", word_count);
+  //words[i][j] = words[i][j] - (words[i][j]>='A' && words[i][j]<='Z')? 'A' : 0;
 
   //Initialize locks
   pthread_mutex_init(&lockPal, NULL);
