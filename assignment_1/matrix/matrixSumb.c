@@ -120,8 +120,8 @@ int main(int argc, char *argv[]) {
       matrix[i][j] = rand()%99;
     }
   }
-  Min = matrix[0][0];
-  Max= matrix[0][0];
+  Min = INT_MAX;
+  Max= 0;
   /* print the matrix */
 #ifdef DEBUG
   for (i = 0; i < size; i++) {
@@ -139,8 +139,8 @@ local_data localdata[numWorkers];
   start_time = read_timer();
   for (l = 0; l < numWorkers; l++) {
     localdata[l].id = l;
-    localdata[l].Local_Min = matrix[0][0];
-    localdata[l].Local_Max = matrix[0][0];
+    localdata[l].Local_Min = INT_MAX;
+    localdata[l].Local_Max = 0;
     localdata[l].Local_Sum = 0;
     pthread_create(&workerid[l], &attr, Worker, (void *) &localdata[l]);
   }
@@ -188,20 +188,9 @@ void *Worker(void *arg) {
   last = (myid == numWorkers - 1) ? (size - 1) : (first + stripSize - 1);
 
 
-
-  Local->Local_Min = INT_MAX;
-  Local->Local_Max = 0;
-  Local->Local_Sum = 0;
-
-  Min=INT_MAX;
-  Max=0;
-  total = 0;
-
-
-
-
   for (i = first; i <= last; i++) {
     for (j = 0; j < size; j++) {
+
 
     Local->Local_Sum += matrix[i][j];
 
@@ -210,7 +199,7 @@ void *Worker(void *arg) {
           Local->iMax = i;
           Local->jMax = j;
       }
-      else if (matrix[i][j] < Local->Local_Min) {
+       if (matrix[i][j] < Local->Local_Min) {
           Local->Local_Min = matrix[i][j];
           Local->iMin = i;
           Local->jMin = j;
@@ -223,22 +212,18 @@ void *Worker(void *arg) {
 
   pthread_mutex_lock(&lockTotal);
   total += Local->Local_Sum;
-  pthread_mutex_unlock(&lockTotal);
-
-  pthread_mutex_lock(&lockMax);
+  
   if (Max < Local->Local_Max) {
     Max = Local->Local_Max;
     iMax = Local->iMax;
     jMax = Local->jMax;
   }
-  pthread_mutex_unlock(&lockMax);
 
-  pthread_mutex_lock(&lockMin);
-  if (Min > Local->Local_Min) {
+  else if (Min > Local->Local_Min) {
     Min = Local->Local_Min;
     iMin = Local->iMin;
     jMin = Local->jMin;
   }
-  pthread_mutex_unlock(&lockMin);
+  pthread_mutex_unlock(&lockTotal);
   pthread_exit(NULL);
 }
