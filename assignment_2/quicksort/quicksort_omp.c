@@ -1,18 +1,19 @@
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
-#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
-#include <time.h>
-#include <sys/time.h>
 #include <omp.h>
 
 #define MAXWORKERS 10
+#define MAXSIZE 1000000
 
 int threadCount = 0;
-pthread_mutex_t mutex;
+
+int size;
+int nb_workers;
+
+
 typedef struct {
     int *arr;
     int min;
@@ -20,46 +21,55 @@ typedef struct {
 } Args;
 
 
-void quicksort (int arr[], int len);
-void quicksortrec(int arr[], int min, int max);
+//void quicksort (int arr[], int len);
+void quicksort(int arr[], int min, int max);
 int split(int arr[], int min, int max);
 int swap(int *a, int *b);
 
 
 
 /* timer */
-double read_timer() {
-    static bool initialized = false;
-    static struct timeval start;
-    struct timeval end;
-    if( !initialized )
-    {
-        gettimeofday( &start, NULL );
-        initialized = true;
-    }
-    gettimeofday( &end, NULL );
-    return (end.tv_sec - start.tv_sec) + 1.0e-6 * (end.tv_usec - start.tv_usec);
-}
+// double read_timer() {
+//     static bool initialized = false;
+//     static struct timeval start;
+//     struct timeval end;
+//     if( !initialized )
+//     {
+//         gettimeofday( &start, NULL );
+//         initialized = true;
+//     }
+//     gettimeofday( &end, NULL );
+//     return (end.tv_sec - start.tv_sec) + 1.0e-6 * (end.tv_usec - start.tv_usec);
+// }
+
+// void quicksort (int arr[], int len){
+//     #pragma omp parallel
+//     {
+//         #pragma omp single
+//         {
+//             quicksortrec(arr, 0, len - 1);
+//         }
+//     }
+// }
 
 
 
-void quicksort (int arr[], int len){
-    quicksortrec(arr, 0, len-1);
-}
-
-
-
- void quicksortrec(int arr[], int min, int max) {
+ void quicksort(int arr[], int min, int max) {
     if(min<max) {
         int pivot= split(arr,min,max);
         #pragma omp parallel sections
         {
-            #pragma omp section
-            quicksortrec(arr,min,pivot-1);
+            // Left partition in parallel if within thread limit
+            #pragma omp parallel shared(arr) if( omp_get_num_threads() < nb_workers)
+            quicksort(arr, min, pivot - 1);
 
-            #pragma omp section
-            quicksortrec(arr,pivot+1, max);
-         }
+            // Right partition in parallel if within thread limit
+            #pragma omp parallel shared(arr) if( omp_get_num_threads() < nb_workers)
+            quicksort(arr, pivot + 1, max);
+
+            // Synchronize tasks
+            //#pragma omp taskwait
+        }
 
     }
 }
@@ -77,39 +87,51 @@ int split(int arr[], int min, int max){
     swap(&arr[i], &arr[max]); // bring pivot in the middle
     return i; // this is where the pivot is
 }
+
+
 int swap(int *a, int *b){
     int temp= *a;
     *a= *b;
     *b=temp;
 }
 
-int main() {
-    //int arr[] = {7,1,8,3,2,4};
-    //int length= 6;
 
-    int length = 10000;
 
-    // Dynamically allocate memory for the array
-    int* arr = (int*)malloc(length * sizeof(int));
+int main(int argc, char *argv[]) {
+    // int arr[] = {7,1,8,3,2,4};
+    // int size= 6;
 
-    // Initialize the array with random values
-    for (int i = 0; i < length; i++) {
+
+    /* read command line args if any */
+    size = (argc > 1) ? atoi(argv[1]) : MAXSIZE;
+    nb_workers = (argc > 2) ? atoi(argv[2]) : MAXWORKERS;
+    if (size > MAXSIZE)
+        size = MAXSIZE;
+    if (nb_workers > MAXWORKERS)
+        nb_workers = MAXWORKERS;
+
+    omp_set_num_threads(nb_workers);
+
+    //
+    // // Dynamically allocate memory for the array
+    int* arr = (int*)malloc(size * sizeof(int));
+
+    // // Initialize the array with random values
+    for (int i = 0; i < size; i++) {
         arr[i] = rand() % 10000;
     }
 
 
-    omp_set_num_threads(32);
-
     double start = omp_get_wtime();
 
-    quicksort(arr, length);
+    quicksort(arr, 0, size-1);
     double end = omp_get_wtime();
 
 
-    //for (int i = 0; i < length; i++)
-    //{
-     //   printf("%d", arr[i]);
-    //}
+    // for (int i = 0; i < size; i++)
+    // {
+    //     printf("%d", arr[i]);
+    // }
 
     printf("\nExecution time: %f seconds\n", end - start);
 
