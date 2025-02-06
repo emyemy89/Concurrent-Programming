@@ -35,6 +35,12 @@ int Semototal = 0;
 int word_count = 0; //How many words actually in file
 int numWorkers; //Actual number of workers
 
+int cmpstr(const void* str1,const void* str2){
+  char *a1 = *(char**)str1;
+  char *a2 = *(char**)str2;
+  return strcmp(a1, a2);
+}
+
 
 /* timer */
 double read_timer() {
@@ -58,13 +64,12 @@ bool binary_search(char* words[], char* target) {
   int mid;
 
   while(left <= right) {
-    mid = left + (right-left)/ 2;
+    mid = (left+right)/ 2;
 
     int cmp = strcmp(words[mid], target);
     if (cmp == 0) {
       return true;
     }
-
     if (cmp > 0) {
       right = mid - 1;
     }
@@ -75,6 +80,7 @@ bool binary_search(char* words[], char* target) {
   }
   return false;
 }
+
 
 bool isPalindrome(char *word) {
   int i;
@@ -91,10 +97,9 @@ bool isPalindrome(char *word) {
 }
 
 bool isSemor(char *word) {
-  //if (isPalindrome(word) == true) {
-    //return false;
-  //}
-
+  if (isPalindrome(word) == true) {
+    return false;
+  }
   int i;
   int wordLength = strlen(word);
   char reversed[wordLength + 1];
@@ -121,24 +126,20 @@ void *Palindrome(void *word) {
 
     //Check for palindroms
     if (i < MAXWORDS && isPalindrome(words[i])) {
-
       Palresults[i] = 1;
       PalCount[myid]++;
 #pragma omp atomic
       Paltotal++;
     }
     else {Palresults[i] = 0;}
-
     //Check for semordnilaps
     if (i<MAXWORDS && isSemor(words[i])) {
-
       Semoresults[i] = 1;
       SemorCount[myid]++;
 #pragma omp atomic
       Semototal++;
     }
     else{Semoresults[i] = 0;}
-
   }
 }
 
@@ -164,6 +165,10 @@ int main(int argc, char *argv[]) {
     if (wordLength > 0 && lineBuff[wordLength - 1] == '\n') {
       lineBuff[wordLength- 1] = '\0';
     }
+
+    for (j = 0; j < wordLength; j++) {
+      lineBuff[j] = tolower(lineBuff[j]);
+    }
     //Allocate space for the word to be stored
     words[word_count] = (char *) malloc((strlen(lineBuff) + 1) * sizeof(char));
     //Move the word in buffer to allocated space
@@ -172,6 +177,7 @@ int main(int argc, char *argv[]) {
   }
   fclose(fp_in);
   printf("There are %d words in the file.\n", word_count);
+  qsort(words, word_count -1 ,  sizeof(char*), cmpstr);
 
 
   /* read command line args if any */
