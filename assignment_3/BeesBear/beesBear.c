@@ -15,7 +15,7 @@
 #define PRODUCERS 5
 #define CAPACITY 10
 
-int H; //Honey pot
+int H = 0; //Honey pot
 int capac;
 
 sem_t mutex; //lock
@@ -30,7 +30,7 @@ void* _Bees(void* arg) {
   printf("Bee number %d is reporting for duty\n", worker_id);
   while(1) {
     sem_wait(&mutex);
-    if (H >= CAPACITY) {
+    if (H >= capac) {
       printf("Bee number %d has filled the pot and waking up the bear\n", worker_id);
       sem_post(&full_pot);
     }
@@ -61,9 +61,6 @@ int main(int argc, char *argv[]) {
 //Inputs from command line:
   //First integer is number of bees. If nothing is specified then it is 5.
   //Second integer is capacity of honey pot. If nothing is specified then it is 10.
-
-
-  H  = 0;
 
   sem_init(&mutex, 0, 1); //Initialize lock
   sem_init(&full_pot, 0, 0);//Initialize condition
