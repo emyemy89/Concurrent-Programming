@@ -1,50 +1,189 @@
+// #ifndef _REENTRANT
+// #define _REENTRANT
+// #endif
+// #include<stdlib.h>
+// #include<stdint.h>
+// #include<stdio.h>
+// #include<unistd.h>
+// #include<pthread.h>
+// #include<semaphore.h>
+//
+// #define MAX_BABY_BIRDS 30
+// #define WORM_NUM 10
+//
+// void *Parent_Bird(void *); // producer
+// void *Baby_Birds(void *); // consumers
+//
+// int num_babies;
+//  // nb worms
+// int worm_count=WORM_NUM;
+//
+// sem_t empty;
+// sem_t full;
+// sem_t mutex;
+//
+//
+//
+//
+// int main(int argc, char *argv[]){
+//     num_babies = (argc > 1) ? atoi(argv[1]) : MAX_BABY_BIRDS;
+//
+//     sem_init(&empty, 0, 0);  // Initially empty when the dish runs out
+//     sem_init(&mutex, 0, 1);  // Mutual exclusion for accessing worm_count
+//
+//
+//     // sem_init(&empty, 0, 0);  // Initially empty when W runs out
+//     // sem_init(&full, 0, worm_count);   // Assume W is the initial number of worms
+//
+//
+//     pthread_t parent_th;
+//     pthread_t baby_id[MAX_BABY_BIRDS]; // array of babies
+//
+//     //create
+//     pthread_create(&parent_th, NULL, Parent_Bird, NULL);
+//     for (int i = 0; i < num_babies; i++) {
+//         int *index = malloc(sizeof(int));
+//         *index = i;
+//         pthread_create(&baby_id[i], NULL, Baby_Birds, (void *) index);
+//     }
+//
+//
+//     //join
+//     pthread_join(parent_th,NULL);
+//     for (int i = 0; i < num_babies; i++) {
+//         pthread_join(baby_id[i], NULL);
+//     }
+//
+//     sem_destroy(&empty);
+//     sem_destroy(&mutex);
+//
+//     return 0;
+//
+// }
+//
+// void *Parent_Bird(void *) {
+//     while (1) {  // Infinite loop
+//         sem_wait(&empty);  // Wait for a baby bird to signal an empty dish
+//         printf("Refilling dish\n");
+//         worm_count = WORM_NUM;  // Refill worms
+//         // for (int i = 0; i < worm_count; i++) {
+//         //     sem_post(&full);  // Signal that worms are available
+//         // }
+//     }
+//     return NULL;
+// }
+//
+// void *Baby_Birds(void *arg) {
+//     int id = *(int *)arg;
+//     free(arg);
+//     //pthread_t thread_id = pthread_self();
+//     while (1) {
+//         sem_wait(&mutex);  // enter critical to access worm count
+//         if (worm_count > 0) {
+//             worm_count--;
+//             printf("Baby bird %d is eating a worm. Worms left: %d\n", id, worm_count);
+//
+//             if (worm_count == 0) {
+//                 printf("Baby bird %d signals that the dish is empty.\n", id);
+//                 sem_post(&empty);  // Signal the parent bird when the dish is empty
+//             }
+//         }
+//         sem_post(&mutex);  // Leave critical section
+//
+//         sleep(1);  // Simulate eating time
+//     }
+//     return NULL;
+// }
+
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
-#include<stdlib.h>
-#include<stdio.h>
-#include<pthread.h>
-#include<semaphore.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <fcntl.h> // for mac error
+#include <sys/stat.h> // Required for mode constants
 
 #define MAX_BABY_BIRDS 30
+#define WORM_NUM 10
 
-void *Parent_Bird(void *); // producer
-void *Baby_Birds(void *); // consumers
+void *Parent_Bird(void *);
+void *Baby_Birds(void *);
 
 int num_babies;
-int W; // nb worms
+int worm_count = WORM_NUM;
 
-sem_t empty;
-sem_t full;
+sem_t *empty;
+sem_t *mutex;
 
-
-
-
-main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
     num_babies = (argc > 1) ? atoi(argv[1]) : MAX_BABY_BIRDS;
 
-    sem_init(&empty, 0, 0);  // Initially empty when W runs out
-    sem_init(&full, 0, W);   // Assume W is the initial number of worms
+    // Create semaphores
+    empty = sem_open("/empty_sem", O_CREAT, 0644, 0);
+    mutex = sem_open("/mutex_sem", O_CREAT, 0644, 1);
 
+    // if (empty == SEM_FAILED || mutex == SEM_FAILED) {
+    //     perror("Failed to open semaphores");
+    //     exit(EXIT_FAILURE);
+    // }
 
     pthread_t parent_th;
-    pthread_t baby_id[MAX_BABY_BIRDS]; // array of babies
+    pthread_t baby_id[MAX_BABY_BIRDS];
 
-    //create
+    // Create threads
     pthread_create(&parent_th, NULL, Parent_Bird, NULL);
     for (int i = 0; i < num_babies; i++) {
-        pthread_create(&baby_id[i], NULL, Baby_Birds,  (void *) i);
+        int *index = malloc(sizeof(int));
+        *index = i;
+        pthread_create(&baby_id[i], NULL, Baby_Birds, (void *)index);
     }
 
+    // Join threads
+    pthread_join(parent_th, NULL);
+    for (int i = 0; i < num_babies; i++) {
+        pthread_join(baby_id[i], NULL);
+    }
 
-    //join
+    // Close and unlink semaphores
+    sem_close(empty);
+    sem_close(mutex);
+    sem_unlink("/empty_sem");
+    sem_unlink("/mutex_sem");
 
+    return 0;
 }
 
-void *Parent_Bird(void *) {
-
+void *Parent_Bird(void *arg) {
+    while (1) {
+        sem_wait(empty);  // Wait for a baby bird to signal an empty dish
+        printf("Refilling dish\n");
+        worm_count = WORM_NUM;
+    }
+    return NULL;
 }
 
-void *Baby_Birds(void *) {
+void *Baby_Birds(void *arg) {
+    int id = *(int *)arg;
+    free(arg);
 
+    while (1) {
+        sem_wait(mutex);  // Enter critical section
+        if (worm_count > 0) {
+            worm_count--;
+            printf("Baby bird %d is eating a worm. Worms left: %d\n", id, worm_count);
+
+            if (worm_count == 0) {
+                printf("Baby bird %d signals that the dish is empty.\n", id);
+                sem_post(empty);  // Signal the parent bird when the dish is empty
+            }
+        }
+        sem_post(mutex);  // Leave critical section
+
+        sleep(1);
+    }
+    return NULL;
 }
