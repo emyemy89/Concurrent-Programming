@@ -21,39 +21,36 @@ int capac;
 sem_t mutex; //lock
 sem_t full_pot; //signaled when pot is full
 
-//threads will enter, if pot is still under capacity it will get the lock and add into the pot and sleep.
-//When pot is empty, a thread (that has the lock) will signal full_pot condition that is in _Bear and give the bear the lock mutex,
-//which will empty the pot and release the lock so the waiting threads can reaquire it and fill the pot again.
+//threads will enter and get the lock, if pot is still under capacity it will add into the pot, release lock and sleep.
+//When pot is full, a thread (that has the lock) will signal full_pot condition that is in _Bear and continue to release the lock,
+//and the bear will empty the pot.
 void* _Bees(void* arg) {
   int worker_id = *((int*)arg);
   free(arg); // Free dynamically allocated memory
   printf("Bee number %d is reporting for duty\n", worker_id);
   while(1) {
     sem_wait(&mutex);
-    if (H >= capac) {
-      printf("Bee number %d has filled the pot and waking up the bear\n", worker_id);
-      sem_post(&full_pot);
-    }
-    else {
-      printf("Bee number %d is putting one portion of honey in the pot\n", worker_id);
-      H++;
-      sem_post(&mutex);
-    }
+     if (H < capac) {
+       printf("Bee number %d is putting one portion of honey in the pot\n", worker_id);
+       H++;
+
+       if (H >= capac) {
+         printf("Bee number %d has filled the pot and waking up the bear\n", worker_id);
+         sem_post(&full_pot);
+       }
+     }
+    sem_post(&mutex);
     Sleep( 10);
   }
 }
 
-
 void* _Bear() {
-
   while(1) {
     sem_wait(&full_pot);
     printf("Bear has been woken and will eat the honey\n");
     H = 0;
-    sem_post(&mutex);
-    Sleep( rand()%1000);
+    Sleep( 10);
   }
-
 }
 
 int main(int argc, char *argv[]) {
@@ -88,8 +85,6 @@ int main(int argc, char *argv[]) {
   for (int l = 0; l < numWorkers; l++) {
     pthread_join(bees[l],NULL);
   }
-
-
   sem_destroy(&mutex);
   sem_destroy(&full_pot);
   return 0;
