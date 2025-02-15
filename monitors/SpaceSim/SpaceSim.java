@@ -3,9 +3,11 @@ import java.util.Random;
 public class SpaceSim {
 
   public static void main(String[] args) {
-    int V = 3; //number of concurrent vehicles
-    int N = 500; //max nitrogen
-    int Q = 500; //max quantum fluid
+    int V = 4; //number of concurrent vehicles
+    int N = 1000; //max nitrogen
+    int Q = 1000; //max quantum fluid
+
+    Random random = new Random();
 
     Station station = new Station(V, N, Q);
 
@@ -16,32 +18,35 @@ public class SpaceSim {
     SupplyV[] suppliers = new SupplyV[number_of_suppliers];
 
     for (int i = 0; i < number_of_vehicles; i++) {
-        vehicles[i] = new SpaceV(station, 50, 50);
-        vehicles[i].start();
+      vehicles[i] =
+        new SpaceV(station, random.nextInt(100), random.nextInt(100));
+      vehicles[i].start();
     }
 
     for (int i = 0; i < number_of_suppliers; i++) {
-        suppliers[i] = new SupplyV(station, 350,400 );
-        suppliers[i].start();
+      suppliers[i] = new SupplyV(station, 400, 400);
+      suppliers[i].start();
     }
 
     for (int i = 0; i < number_of_vehicles; i++) {
-        try {
-          vehicles[i].join();
-        } catch (InterruptedException e) {}
-      }
-  
-      //Join supplier threads
-      for (int i = 0; i < number_of_suppliers; i++) {
-        try {
-          suppliers[i].join();
-        } catch (InterruptedException e) {}
-      }
+      try {
+        vehicles[i].join();
+      } catch (InterruptedException e) {}
+    }
 
-      System.out.println("Program finished");
+    //Join supplier threads
+    for (int i = 0; i < number_of_suppliers; i++) {
+      try {
+        suppliers[i].join();
+      } catch (InterruptedException e) {}
+    }
+
+    System.out.println("Program finished");
   }
 
-  //Thread that refuels from station
+
+  //Thread that gets fuel from station. It sleeps after getting fuel to simulate space travel.
+  //Each thread will do this 5 times then terminate
   static class SpaceV extends Thread {
 
     private Station station;
@@ -65,13 +70,13 @@ public class SpaceSim {
         try { //sleep
           Thread.sleep(random.nextInt(2000)); //to simulate spacce travel
         } catch (InterruptedException e) {}
-        
       }
-      System.out.println("Vehicle finished refueling");
+      System.out.println(getName() + " finished refueling");
     }
   }
 
-  //Thread that brings fuel to the station
+  //Thread that brings fuel to the station. It sleeps after supplying fuel to simulate travel.
+  //Then it gets fuel from the station for its journey
   static class SupplyV extends Thread {
 
     private Station station;
@@ -88,11 +93,10 @@ public class SpaceSim {
     @Override
     public void run() {
       station.refuel_station(N_supplied, Q_supplied); //supply fuel
-
       station.request_fuel(random.nextInt(50), random.nextInt(50)); //get fuel
 
       try { //sleep
-        Thread.sleep(random.nextInt(4000));//to simulate travel
+        Thread.sleep(random.nextInt(4000)); //to simulate travel
       } catch (InterruptedException e) {}
     }
   }
