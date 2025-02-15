@@ -20,8 +20,15 @@ public class Station {
     Q_available = Q;
   }
 
-  public void request_fuel(int requested_N, int requesed_Q) {
+  public void request_fuel(int requested_N, int requested_Q) {
     synchronized (this) {
+
+
+        if (requested_N == 0 && requested_Q == 0) {
+            return;
+        }
+
+
       while (V_available == 0) { //wait for open slot
         try {
           wait();
@@ -30,25 +37,33 @@ public class Station {
 
       V_available--;
 
-      while (requested_N > N_available || requesed_Q > Q_available) { //wait for fuel without blocking
+      long start_time = System.currentTimeMillis();
+      long timeout = 5000; //5 seconds timeout
+
+      while ( 
+      (requested_N > 0 && requested_N > N_available) || 
+      (requested_Q > 0 && requested_Q > Q_available)){ //wait for fuel without blocking
         try {
-          wait();
+          wait(timeout);
+          if (System.currentTimeMillis()-start_time >= timeout) { //in case thread is in deadlock, exit
+            return;
+        }
         } catch (InterruptedException e) {}
       }
 
       N_available -= requested_N;
-      Q_available -= requesed_Q;
+      Q_available -= requested_Q;
       System.out.println(
         Thread.currentThread().getName() +
         " has recieved " +
         requested_N +
         " Nitrogen and " +
-        requesed_Q +
+        requested_Q +
         " quantum fuel"
       );
     }
     try {
-      Thread.sleep(500);
+      Thread.sleep(500); //to simulate refueling time
     } catch (InterruptedException e) {}
 
     leave_station();

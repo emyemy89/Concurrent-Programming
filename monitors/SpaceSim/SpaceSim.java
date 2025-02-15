@@ -10,15 +10,35 @@ public class SpaceSim {
     Station station = new Station(V, N, Q);
 
     int number_of_vehicles = 5;
-    int number_of_suppliers = 2;
+    int number_of_suppliers = 3;
+
+    SpaceV[] vehicles = new SpaceV[number_of_vehicles];
+    SupplyV[] suppliers = new SupplyV[number_of_suppliers];
 
     for (int i = 0; i < number_of_vehicles; i++) {
-      new SpaceV(station, 100,100 ).start();
+        vehicles[i] = new SpaceV(station, 50, 50);
+        vehicles[i].start();
     }
 
     for (int i = 0; i < number_of_suppliers; i++) {
-      new SupplyV(station, 350, 400).start();
+        suppliers[i] = new SupplyV(station, 350,400 );
+        suppliers[i].start();
     }
+
+    for (int i = 0; i < number_of_vehicles; i++) {
+        try {
+          vehicles[i].join();
+        } catch (InterruptedException e) {}
+      }
+  
+      //Join supplier threads
+      for (int i = 0; i < number_of_suppliers; i++) {
+        try {
+          suppliers[i].join();
+        } catch (InterruptedException e) {}
+      }
+
+      System.out.println("Program finished");
   }
 
   //Thread that refuels from station
@@ -43,10 +63,11 @@ public class SpaceSim {
         station.request_fuel(N_requested, Q_requested); //get fuel
         nb_of_visits++;
         try { //sleep
-          Thread.sleep(random.nextInt(2000));
+          Thread.sleep(random.nextInt(2000)); //to simulate spacce travel
         } catch (InterruptedException e) {}
         
       }
+      System.out.println("Vehicle finished refueling");
     }
   }
 
@@ -68,10 +89,10 @@ public class SpaceSim {
     public void run() {
       station.refuel_station(N_supplied, Q_supplied); //supply fuel
 
-      station.request_fuel(random.nextInt(100), random.nextInt(100)); //get fuel
+      station.request_fuel(random.nextInt(50), random.nextInt(50)); //get fuel
 
       try { //sleep
-        Thread.sleep(random.nextInt(4000));
+        Thread.sleep(random.nextInt(4000));//to simulate travel
       } catch (InterruptedException e) {}
     }
   }
