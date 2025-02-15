@@ -13,7 +13,7 @@ public class SpaceSim {
     int number_of_suppliers = 2;
 
     for (int i = 0; i < number_of_vehicles; i++) {
-      new SpaceV(station, 100, 100).start();
+      new SpaceV(station, 100,100 ).start();
     }
 
     for (int i = 0; i < number_of_suppliers; i++) {
