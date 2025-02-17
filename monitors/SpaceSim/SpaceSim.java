@@ -4,15 +4,15 @@ public class SpaceSim {
 
   public static void main(String[] args) {
     int V = 4; //number of concurrent vehicles
-    int N = 1000; //max nitrogen
-    int Q = 1000; //max quantum fluid
+    int N = 600; //max nitrogen
+    int Q = 600; //max quantum fluid
 
     Random random = new Random();
 
     Station station = new Station(V, N, Q);
 
-    int number_of_vehicles = 5;
-    int number_of_suppliers = 3;
+    int number_of_vehicles = 2;
+    int number_of_suppliers = 2;
 
     SpaceV[] vehicles = new SpaceV[number_of_vehicles];
     SupplyV[] suppliers = new SupplyV[number_of_suppliers];
@@ -24,7 +24,7 @@ public class SpaceSim {
     }
 
     for (int i = 0; i < number_of_suppliers; i++) {
-      suppliers[i] = new SupplyV(station, 400, 400);
+      suppliers[i] = new SupplyV(station, 300, 300);
       suppliers[i].start();
     }
 
@@ -92,12 +92,13 @@ public class SpaceSim {
 
     @Override
     public void run() {
+      try {
+        Thread.sleep(4000); //to simulate space travel
+      } catch (InterruptedException e) {}
       station.refuel_station(N_supplied, Q_supplied); //supply fuel
       station.request_fuel(random.nextInt(50), random.nextInt(50)); //get fuel
 
-      try { //sleep
-        Thread.sleep(random.nextInt(4000)); //to simulate travel
-      } catch (InterruptedException e) {}
+
     }
   }
 }

@@ -24,8 +24,8 @@ public class Station {
   //If there is enough fuel of both types it will take the fuel and sleep to simulate refueling, if not it will wait for a signal. 
   //If it waits more than timeout, it will exit the function, which means there are no supply ships anymore.
   
-  public void request_fuel(int requested_N, int requested_Q) {
-    synchronized (this) {
+  public synchronized void request_fuel(int requested_N, int requested_Q) {
+  
       if (requested_N == 0 && requested_Q == 0) {
         return;
       }
@@ -54,6 +54,10 @@ public class Station {
         } catch (InterruptedException e) {}
       }
 
+      try {
+        Thread.sleep(500); //to simulate refueling time
+      } catch (InterruptedException e) {}
+
       N_available -= requested_N;
       Q_available -= requested_Q;
       System.out.println(
@@ -64,10 +68,8 @@ public class Station {
         requested_Q +
         " quantum fuel"
       );
-    }
-    try {
-      Thread.sleep(500); //to simulate refueling time
-    } catch (InterruptedException e) {}
+    
+
 
     leave_station();
   }
@@ -77,9 +79,7 @@ public class Station {
   public synchronized void leave_station() {
     V_available++;
     notifyAll();
-    System.out.println(
-      Thread.currentThread().getName() + " has left the station"
-    );
+
   }
 
 
