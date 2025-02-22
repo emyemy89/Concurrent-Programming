@@ -1,65 +1,89 @@
-#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <mpi.h>
 
-void teacher(int n) {
-    int student_rank;
-    int arr[n];
+
+void teacher(int size) {
+    int students[size];
+    // students array
+    students[0] = 1; // Teacher is 1, not free
+    for (int i = 1; i < size; i++) {
+        students[i] = 0;// students are 0, free
+    }
+
+    // Randomly choose the first student to start
+    int first_student = rand() % size;
+    while (students[first_student] != 0) {
+        first_student = (first_student + 1) % size;
+    }
+    MPI_Send(students, size, MPI_INT, first_student, 0, MPI_COMM_WORLD);
+}
+
+void student(int size, int rank) {
+    int students[size];
     MPI_Status status;
 
-    // Request each student's rank one by one
-    for (int i = 0; i < n; i++) {
-        //int request_signal = 1;
-        // MPI_Ssend(&request_signal, 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(&student_rank, 1, MPI_INT, i + 1, 0, MPI_COMM_WORLD, &status);
-        arr[i] = student_rank;
-    }
+    MPI_Recv(students, size, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-    // Pair students
-    for (int i = 0; i < n - 1; i += 2) {
-        MPI_Ssend(&arr[i + 1], 1, MPI_INT, arr[i], 0, MPI_COMM_WORLD);
-        MPI_Ssend(&arr[i], 1, MPI_INT, arr[i + 1], 0, MPI_COMM_WORLD);
-    }
+    if (students[rank] == 0) {// Does not have a partner
+        students[rank] = rank;
 
-    // Handle the odd student if n is odd
-    if (n % 2 == 1) {
-        MPI_Ssend(&arr[n - 1], 1, MPI_INT, arr[n - 1], 0, MPI_COMM_WORLD);
+        // see if there is any student not taken
+        int next_exists = 0;
+        for (int i = 1; i < size; i++) {
+            if (students[i] == 0) {
+                next_exists = 1;
+                break;
+            }
+        }
+
+        if (next_exists) {
+            // find next partner
+            int partner = rand() % size;
+            while (students[partner] != 0) { // loop until we find sb free
+                partner = (partner + 1) % size;
+            }
+
+            students[partner] = rank;
+            students[rank] = partner;
+            printf("Student %d is paired with Student %d\n", rank, partner);
+
+            // Let partner know it s taken
+            MPI_Send(students, size, MPI_INT, partner, 0, MPI_COMM_WORLD);
+
+            // let the next get a partner, if any left
+            for (int i = 1; i < size; i++) {
+                if (students[i] == 0) { // when we find free student, send him the array
+                    MPI_Send(students, size, MPI_INT, i, 0, MPI_COMM_WORLD);
+                    break;
+                }
+            }
+        } else {
+            // no partner left
+            printf("Student %d is working alone\n", rank);
+        }
+    } else {
+        // Already has a partner
+        printf("Student %d is paired with Student %d\n", rank, students[rank]);
     }
 }
 
-void students(int rank) {
-    int partner;
-    MPI_Status status;
-    //int request_signal;
-
-    // Wait for the teacher to request the rank
-    //MPI_Recv(&request_signal, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-    MPI_Ssend(&rank, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-
-    // Receive partner info from the teacher
-    MPI_Recv(&partner, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-
-    // Print the result (flush ensures it prints immediately)
-    printf("Student %d is paired with Student %d\n", rank, partner);
-    fflush(stdout);
-}
-
-int main(int argc, char **argv) {
-    int rank, size;
+int main(int argc, char* argv[]) {
+    int size, rank;
 
     MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    int n = size - 1; // Exclude teacher
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    srand(time(NULL) + rank);
 
     if (rank == 0) {
-        teacher(n);
+        teacher(size);
     } else {
-        students(rank);
+        student(size, rank);
     }
 
     MPI_Finalize();
     return 0;
 }
-
-
