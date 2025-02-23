@@ -47,7 +47,7 @@ void student(int size, int rank) {
 
             students[partner] = rank;
             students[rank] = partner;
-            printf("Student %d is paired with Student %d\n", rank, partner);
+            printf("Student number %d is paired with student %d\n", rank, partner);
 
             // Let partner know it s taken
             MPI_Send(students, size, MPI_INT, partner, 0, MPI_COMM_WORLD);
@@ -64,8 +64,8 @@ void student(int size, int rank) {
             printf("Student %d is working alone\n", rank);
         }
     } else {
-        // Already has a partner
-        printf("Student %d is paired with Student %d\n", rank, students[rank]);
+        //already has a partner
+        printf("Student number %d is paired with student %d\n", rank, students[rank]);
     }
 }
 
